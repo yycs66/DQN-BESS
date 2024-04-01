@@ -14,9 +14,9 @@ import pyomo.environ as pyo
 import pyomo.kernel as pmo
 from omlt import OmltBlock
 import json
-import offer_utils as ou
+#import offer_utils as ou
 import argparse
-from market_participant import Agent
+from dummy_offer import Agent
 
 
 import tempfile 
