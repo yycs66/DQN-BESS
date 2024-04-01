@@ -16,7 +16,7 @@ from omlt import OmltBlock
 import json
 import offer_utils as ou
 import argparse
-from dummy_offer import Agent
+from market_participant import Agent
 
 
 import tempfile 
