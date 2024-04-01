@@ -1,7 +1,7 @@
 <<<<<<< HEAD
 # ------------------------------------------------------------------------
 
-# MIP_DQN2 deletes Actor_MIP
+# A copy of BESS_DQN.py which implemnts the ddpg for bess
 # ------------------------------------------------------------------------
 import pickle
 import torch
