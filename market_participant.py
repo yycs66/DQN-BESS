@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # ------------------------------------------------------------------------
 
 # A copy of BESS_DQN.py which implemnts the ddpg for bess
@@ -46,7 +46,7 @@ socmin = 128
 chmax = 125
 dcmax = 125
 efficiency = 0.892
-<<<<<<< HEAD
+
 =======
 
 >>>>>>> a572ce81a4fba6669fedb6dde2510e2f8269e39c
@@ -59,7 +59,7 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-<<<<<<< HEAD
+
     
 ## define net
 class ReplayBuffer:
@@ -206,7 +206,7 @@ class Agent():
     Output:
     - make_me_an_offer() reads the market type and saves to disc a JSON file containing offer data
     '''
-<<<<<<< HEAD
+
     def __init__(self, time_step, market_info, resource_info):
         
 =======
@@ -230,7 +230,7 @@ class Agent():
         self.price_ceiling = 999
         self.price_floor = 0
 
-<<<<<<< HEAD
+
         
 
         #agent parameters
@@ -826,7 +826,7 @@ if __name__ == '__main__':
     # Read in information from the market
     uid = market_info["uid"]
     market_type = market_info["market_type"]
-<<<<<<< HEAD
+
     rid = resource_info["rid"]
     ##to do:check if time_step in weasle is the same as in the agent
 
