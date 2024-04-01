@@ -13,7 +13,7 @@ import os
 import sys
 import json
 import argparse
-from market_participant import Agent
+from dummy_offer import Agent
 import datetime
 
 
