@@ -143,7 +143,7 @@ class DAEnv(gym.Env):
         #also can transfer it into normalized state
         soc=self.battery.SOC() # get the soc of the battery 
         time_step=self.current_time
-        price=self.data_manager.prev_pricee # get the prediction price
+        price=self.data_manager.prev_price # get the prediction price
         profit=self.data_manager.profit # get the profit
         obs=np.concatenate((np.float32(time_step),np.float32(price),np.float32(soc), np.float32(profit)),axis=None)
         return obs
