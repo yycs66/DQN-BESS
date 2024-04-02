@@ -115,16 +115,16 @@ class Arguments:
 
         self.net_dim = 64  # the network width 256
         self.batch_size = 256  # num of transitions sampled from replay buffer.
-        self.repeat_times = 2 ** 3  # repeatedly update network to keep critic's loss small
+        self.repeat_times = 2 ** 2  # repeatedly update network to keep critic's loss small
         self.target_step = 1000 # collect target_step experiences , then update network, 1024
         self.max_memo = 50000  # capacity of replay buffer
         ## arguments for controlling exploration
         self.explorate_decay=0.99
         self.explorate_min=0.3
         '''Arguments for evaluate'''
-        self.random_seed_list=[1234,2234,3234,4234,5234]
+        self.random_seed_list=[1234]
         # self.random_seed_list=[2234]
-        self.run_name='Battery_DQN_experiments'
+        self.run_name='Battery_RL_experiments'
         '''Arguments for save'''
         self.train=True
         self.save_network=True
@@ -297,7 +297,7 @@ class AgentDA(AgentBase):
     def update_net(self, buffer, batch_size, repeat_times, soft_update_tau, state_dim) -> tuple:
         buffer.update_now_len()
         obj_critic = obj_actor = None
-        for update_c in range(int(buffer.now_len / batch_size * repeat_times)):# we update too much time?
+        for update_c in range(int(buffer.now_len / batch_size * repeat_times)):# update_c is the number of updates
             obj_critic, state = self.get_obj_critic(buffer, state_dim, batch_size)
             self.optim_update(self.cri_optim, obj_critic)
 
@@ -358,6 +358,9 @@ def get_episode_return(env, act, device):
     return episode_return
 
 def train_agent(time_step, market_info, resource_info):
+    all_actions = []
+    all_eps_rewards = []
+    all_cummulative_rewards = []
     # Create an instance of the AgentDA class
     agent = AgentDA(time_step, market_info, resource_info)
     env = DAEnv(time_step, market_info, resource_info)
@@ -378,22 +381,30 @@ def train_agent(time_step, market_info, resource_info):
 
         with torch.no_grad():
             episode_reward = get_episode_return(env, agent.act, agent.device)
+            all_eps_rewards.append(episode_reward)
             # Log or record the episode reward, unbalance, and operation cost as needed
 
-        print(f'current episode is {i_episode}, reward:{episode_reward}, buffer_length: {buffer.now_len}')
+        #print(f'current episode is {i_episode}, reward:{episode_reward}, buffer_length: {buffer.now_len}')
 
         if i_episode % 10 == 0:
             agent._update_exploration_rate(args.explorate_decay, args.explorate_min)
             trajectory = agent.explore_env(env, args.target_step)
             update_buffer(trajectory)
+            all_actions.extend(item[1][2:] for item in trajectory)
+            all_cummulative_rewards.append(np.sum(all_eps_rewards))
+    # Save actions and rewards
+    with open(f'{args.cwd}/actions.pkl', 'wb') as f:
+        pickle.dump(all_actions, f)
 
+    with open(f'{args.cwd}/rewards.pkl', 'wb') as f:
+        pickle.dump(all_eps_rewards, f)
     # Save the trained agent's parameters if needed
     if args.save_network:
         act_save_path = f'{args.cwd}/actor.pth'
         cri_save_path = f'{args.cwd}/critic.pth'
         torch.save(agent.act.state_dict(), act_save_path)
         torch.save(agent.cri.state_dict(), cri_save_path)
-        print('Training finished and actor and critic parameters have been saved')
+        #print('Training finished and actor and critic parameters have been saved')
 
 if __name__ == '__main__':
     # Add argument parser for three required input arguments
