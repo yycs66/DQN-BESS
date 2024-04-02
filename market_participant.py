@@ -12,9 +12,8 @@ import pandas as pd
 from typing import Tuple
 import pyomo.environ as pyo
 import pyomo.kernel as pmo
-from omlt import OmltBlock
 import json
-#import offer_utils as ou
+import offer_utils as ou
 import argparse
 from dummy_offer import Agent
 
@@ -25,7 +24,7 @@ import torch.onnx
 #uitiities for converting torch.nn module to onnx
 import torch.nn as nn
 from copy import deepcopy
-import wandb
+#import wandb
 #Weights & Biases, a tool for tracking and visualizing machine learning experiments
 from Storage_random import DAEnv
 #torch.cuda.is_available()
@@ -421,7 +420,7 @@ if __name__ == '__main__':
     rid = resource_info["rid"]
     ##to do:check if time_step in weasle is the same as in the agent
 
-    os.environ["WANDB_API_KEY"] = "df5048753b47e0d3fb14ffae7704c794cd0639f1"
+    #os.environ["WANDB_API_KEY"] = "df5048753b47e0d3fb14ffae7704c794cd0639f1"
     args = Arguments()
     args.init_before_training(if_main=True)
     train_agent(time_step, market_info, resource_info)
