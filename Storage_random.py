@@ -55,8 +55,8 @@ class LoadData():
         self.price_floor = 0
         
         self.prev_price =self.market["previous"][type]["prices"]["EN"]
-        self.prev_avg_price = self.market['history']['prices']['EN'].mean()
-        self.prev_max_price = self.market['history']['prices']['EN'].max()
+        self.prev_avg_price = self.market['history'][type]['prices']['EN'].mean()
+        self.prev_max_price = self.market['history'][type]['prices']['EN'].max()
         self.init_soc = self.resource['status'][self.rid]['soc'] if self.resource['status'] is not None and self.rid in self.resource['status'] else 0
         self.init_temp = self.resource['status'][self.rid]['temp'] if self.resource['status'] is not None and self.rid in self.resource['status'] else 0
         self.init_degredation = resource_info['status'][self.rid]['degradation'] if resource_info['status'] is not None and self.rid in resource_info['status'] else 0
