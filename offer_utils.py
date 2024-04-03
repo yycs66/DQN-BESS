@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 '''
 Utility functions to support the make_offer.py code
 '''
@@ -134,4 +133,4 @@ def save_offer(offer, time_step):
         json_file = f'offer_{time_step}.json'
         with open(json_file, "w") as f:
             json.dump(offer, f, cls=NpEncoder, indent=4)
->>>>>>> a572ce81a4fba6669fedb6dde2510e2f8269e39c
+
