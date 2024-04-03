@@ -15,7 +15,7 @@ import pyomo.kernel as pmo
 import json
 import offer_utils as ou
 import argparse
-from dummy_offer import Agent
+from dummy_algorithm_Br import Agent
 
 
 import tempfile 
