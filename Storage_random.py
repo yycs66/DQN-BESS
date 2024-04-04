@@ -4,7 +4,6 @@
 # ------------------------------------------------------------------------
 import random
 import numpy as np
-
 import pandas as pd 
 import gym
 from gym import spaces 
@@ -54,7 +53,7 @@ class LoadData():
         self.price_ceiling = 999
         self.price_floor = 0
         
-        self.prev_price =self.market["previous"][type]["prices"]["EN"]
+        self.prev_price = self.market["previous"][type]["prices"]["EN"]
         self.prev_avg_price = self.market['history'][type]['prices']['EN'].mean()
         self.prev_max_price = self.market['history'][type]['prices']['EN'].max()
         self.init_soc = self.resource['status'][self.rid]['soc'] if self.resource['status'] is not None and self.rid in self.resource['status'] else 0
