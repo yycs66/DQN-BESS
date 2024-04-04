@@ -15,7 +15,7 @@ import pyomo.kernel as pmo
 import json
 import offer_utils as ou
 import argparse
-from dummy_algorithm_Br import Agent
+import dummy_algorithm_Br as da
 
 
 import tempfile 
@@ -147,7 +147,7 @@ class Arguments:
         #torch.manual_seed(self.random_seed)
         torch.set_default_dtype(torch.float32)
 
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(self.visible_gpu)# control how many GPU is used 　
+        #os.environ['CUDA_VISIBLE_DEVICES'] = str(self.visible_gpu)# control how many GPU is used 　
 class Actor(nn.Module):
     def __init__(self,mid_dim,state_dim,action_dim):
         super().__init__()
@@ -349,7 +349,8 @@ def get_episode_return(env, act, device):
         s_tensor = torch.as_tensor((state,), device=device) # convert a current state to tensor
         a_tensor = act(s_tensor) #call the actor network to get the action tensor
         action = a_tensor.detach().cpu().numpy()[0]  # get action variable by detaching the tensor and converting to numpy
-        state, next_state, reward, done,= env.step(market_info,Agent)
+        dummy_agent= da.Agent(time_step, market_info, resource_info)
+        state, next_state, reward, done,= env.step(market_info,dummy_agent,action)
         state=next_state
         episode_return += reward
         
