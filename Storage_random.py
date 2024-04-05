@@ -61,7 +61,7 @@ class LoadData():
         self.init_temp = self.resource['status'][self.rid]['temp'] if self.resource['status'] is not None and self.rid in self.resource['status'] else 0
         self.init_degredation = cleared_rersource['status'][self.rid]['degradation'] if cleared_rersource['status'] is not None and self.rid in cleared_rersource['status'] else 0
         self.schedule = cleared_rersource['schedule'][self.rid]['EN']
-        self.profit = cleared_rersource['score'][self.rid]['current'] if cleared_rersource['score'] is not None and self.rid in cleared_rersource['score'] else 0
+        self.profit = cleared_rersource['score']['current'] 
 
 class Battery():
     '''simulate a simple battery here'''
@@ -157,19 +157,20 @@ class DAEnv(gym.Env):
         # Get the original cost offers from the dummy algorithm
         market_type = cleared_market['type']
         dummy_offer = Agent.make_me_an_offer()
+        time_step =Agent.step
 
         if 'DAM' in market_type:
             keys_factor ={'blaoc_ch_mc':scaling_factor,'block_dc_oc':scaling_factor}
             for key, factor in keys_factor.items():
                 dummy_offer[key] = dummy_offer[key] * factor
-            with open('dummy_offer.json', 'w') as f: #todo: dummy offer's name is needed
+            with open(f'offer_{self.step}.json', 'w') as f: #todo: dummy offer's name is needed
                 json.dump(dummy_offer, f, cls=NpEncoder)
 
         else:
             keys_factor ={'blaoc_soc_mc':scaling_factor,'block_ch_oc':scaling_factor}
             for key, factor in keys_factor.items():
                 dummy_offer[key] = dummy_offer[key] * factor
-            with open('dummy_offer.json', 'w') as f: #todo: dummy offer's name is needed
+            with open(f'offer_{self.step}.json', 'w') as f: #todo: dummy offer's name is needed
                 json.dump(dummy_offer, f, cls=NpEncoder)
 
         return dummy_offer # todo: a full offer needed
@@ -227,7 +228,8 @@ if __name__ == '__main__':
     rid = cleared_rersource["rid"]
     
 
-    env = DAEnv(next_time_step, cleared_market, cleared_rersource)
+    env = DAEnv(next_time_step, cleared_market, cleared_rersource) # todo: inputs is necessary or not?
+
     env.TRAIN = False
     rewards = []
     env.reset()

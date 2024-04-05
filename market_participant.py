@@ -491,15 +491,16 @@ if __name__ == '__main__':
     market_type = market_info["market_type"]
     rid = resource_info["rid"]
     da_agent = da.Agent(time_step,market_info, resource_info)
-    #
-    da_agent.make_an_offer()## scaled_offer=f(action, dummy_offer)
+    #todo add intial value of action at time_step=0
+    DAEnv.scale_cost_offers(action, da_agent)()## scaled_offer=f(action, dummy_agent)
     # Save the updated market information to a file
     with open(f'market_{time_step}.json', 'w') as f:
         json.dump(market_info, f, cls=NpEncoder)
     with open(f'resource_{time_step}.json', 'w') as f:
         json.dump(resource_info, f, cls=NpEncoder)
-
-    
+    # get cleared market and resource information
+    cleared_market = market_info
+    cleared_rersource = resource_info
     #new_time_step =time_step+1
     
     
