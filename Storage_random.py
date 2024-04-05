@@ -149,30 +149,32 @@ class DAEnv(gym.Env):
         profit=self.data_manager.profit # get the profit
         obs=np.concatenate((np.float32(next_time_step),np.float32(price),np.float32(soc), np.float32(profit)),axis=None)
         return obs
-    def scale_cost_offers(self, action, cleared_market, Agent):
+    def scale_cost_offers(self, action, Agent):
         # Scale the cost offers from the dummy algorithm based on the action
         # The action is a scaling factor in the range [0.1, 10]
         scaling_factor = 0.1 + 9.9 * (action.item() + 1) / 2
 
         # Get the original cost offers from the dummy algorithm
         market_type = cleared_market['type']
+        dummy_offer = Agent.make_me_an_offer()
+
         if 'DAM' in market_type:
-            original_charge_cost = Agent._day_ahead_offer()['block_ch_mc']
-            original_discharge_cost = Agent._day_ahead_offer()['block_dc_mc']
-            # Scale the cost offers
-            charge_cost = original_charge_cost * scaling_factor
-            discharge_cost = original_discharge_cost * scaling_factor
-            soc_oc = None
+            keys_factor ={'blaoc_ch_mc':scaling_factor,'block_dc_oc':scaling_factor}
+            for key, factor in keys_factor.items():
+                dummy_offer[key] = dummy_offer[key] * factor
+            with open('dummy_offer.json', 'w') as f: #todo: dummy offer's name is needed
+                json.dump(dummy_offer, f, cls=NpEncoder)
 
         else:
-            original_soc_oc = Agent._real_time_offer()['block_soc_oc']
-            soc_oc = original_soc_oc * scaling_factor
-            charge_cost = None
-            discharge_cost = None
+            keys_factor ={'blaoc_soc_mc':scaling_factor,'block_ch_oc':scaling_factor}
+            for key, factor in keys_factor.items():
+                dummy_offer[key] = dummy_offer[key] * factor
+            with open('dummy_offer.json', 'w') as f: #todo: dummy offer's name is needed
+                json.dump(dummy_offer, f, cls=NpEncoder)
 
-        return charge_cost, discharge_cost, soc_oc
+        return dummy_offer # todo: a full offer needed
     
-    def step(self,action,cleared_market,Agent):
+    def step(self,action,cleared_resource):#todo: need track time_step
     # state transition here current_obs--take_action--get reward-- get_finish--next_obs
     ## here we want to put take action into each components
         # Scale the cost offers from the dummy algorithm
@@ -180,20 +182,7 @@ class DAEnv(gym.Env):
         self.battery.step(action[0])
         # here execute the state-transition part, battery.current_soc also changed
         
-        current_output=np.array((-self.battery.energy_change))#truely corresonding to the result
-        self.current_output=current_output
-        
-        price=current_obs[1]
-        charge_cost, discharge_cost, soc_oc = self.scale_cost_offers(action, cleared_market, Agent)    
-        reward=0
-        
-        battery_cost=self.battery._get_cost(self.battery.energy_change)# we set it as 0 this time 
-        
-        if self.battery.energy_change < 0: # discharge
-            reward = -(battery_cost + price*self.battery.energy_change*self.battery.efficiency)
-        else:
-            reward = -(battery_cost + price*self.battery.energy_change)
-        self.total_reward += reward
+        reward= cleared_resource['score']["current"]
 
         '''here we also need to store the final step outputs for the final steps including, soc, output of units for seeing the final states'''
         final_step_outputs=[self.battery.current_soc]
@@ -201,12 +190,11 @@ class DAEnv(gym.Env):
             self.current_time = (datetime.datetime.strptime(self.current_time, '%Y%m%d%H%M') + datetime.timedelta(hours=1)).strftime('%Y%m%d%H%M')
         else:
             self.current_time = (datetime.datetime.strptime(self.current_time, '%Y%m%d%H%M') + datetime.timedelta(minutes=5)).strftime('%Y%m%d%H%M')
-        finish=(self.current_time==self.episode_length)
+        finish=(self.current_time==self.episode_length) #todo: maybe time_step is better
         if finish:
             self.final_step_outputs=final_step_outputs
             self.current_time=0
-            next_obs=self.reset()
-            
+            next_obs=self.reset()     
         else:
             next_obs=self._build_state()
         return current_obs,next_obs,float(reward),finish
