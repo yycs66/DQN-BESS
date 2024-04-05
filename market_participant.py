@@ -15,7 +15,7 @@ import pyomo.kernel as pmo
 import json
 import offer_utils as ou
 import argparse
-import dummy_algorithm_Br as da
+from dummy_algorithm_Br import Agent
 
 
 import tempfile 
@@ -43,7 +43,29 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-    
+  
+class LoadData():
+    def __init__(self, next_time_step, cleared_market, cleared_rersource):##todo don't next next_time_step
+        # Data input from WEASLE
+        self.step = next_time_step
+        self.market = cleared_market
+        self.resource = cleared_rersource
+        self.rid = cleared_rersource['rid']
+        type = self.market['uid'][:5]
+        print(type)
+        # Configurable options
+        self.price_ceiling = 999
+        self.price_floor = 0
+        
+        self.prev_price = self.market["previous"][type]["prices"]["EN"]
+        self.prev_avg_price = self.market['history'][type]['prices']['EN'].mean()
+        self.prev_max_price = self.market['history'][type]['prices']['EN'].max()
+        self.init_soc = self.resource['status'][self.rid]['soc'] if self.resource['status'] is not None and self.rid in self.resource['status'] else 0
+        self.init_temp = self.resource['status'][self.rid]['temp'] if self.resource['status'] is not None and self.rid in self.resource['status'] else 0
+        self.init_degredation = cleared_rersource['status'][self.rid]['degradation'] if cleared_rersource['status'] is not None and self.rid in cleared_rersource['status'] else 0
+        self.schedule = cleared_rersource['schedule'][self.rid]['EN']
+        self.profit = cleared_rersource['score'][self.rid]['current'] if cleared_rersource['score'] is not None and self.rid in cleared_rersource['score'] else 0
+
 ## define net
 class ReplayBuffer:
     def __init__(self, max_len, state_dim, action_dim, gpu_id=0):
@@ -143,8 +165,9 @@ class Arguments:
             # Create a new cwd directory
             os.makedirs(self.cwd, exist_ok=True)
 
-        #np.random.seed(self.random_seed)
-        #torch.manual_seed(self.random_seed)
+
+        np.random.seed(self.random_seed)
+        torch.manual_seed(self.random_seed)
         torch.set_default_dtype(torch.float32)
 
         #os.environ['CUDA_VISIBLE_DEVICES'] = str(self.visible_gpu)# control how many GPU is used 　
@@ -285,14 +308,20 @@ class AgentBase:
         self.explore_rate = max(self.explore_rate * explorate_decay, explore_rate_min)
         '''this function is used to update the explorate probability when select action'''
 class AgentDA(AgentBase):
-    def __init__(self, time_step, market_info, resource_info):
-        super().__init__(time_step, market_info, resource_info)
+    def __init__(self, time_step, cleared_market, resource_info):
+        super().__init__(time_step, cleared_market, resource_info)
         self.explore_noise = 0.5  # standard deviation of exploration noise
         self.policy_noise = 0.2  # standard deviation of policy noise
         self.update_freq = 2  # delay update frequency
         self.if_use_cri_target = self.if_use_act_target = True
         self.ClassCri = CriticQ
         self.ClassAct = Actor
+    
+    def scaled_offer(self,da):
+        action = self.select_action(self.state)
+        
+        scaled_offer = action * da.make_an_offer()
+        return scaled_offer
 
     def update_net(self, buffer, batch_size, repeat_times, soft_update_tau, state_dim) -> tuple:
         buffer.update_now_len()
@@ -336,21 +365,21 @@ def update_buffer(_trajectory):
     buffer.extend_buffer(ten_state, ary_other)
 
     _steps = ten_state.shape[0]
-    _r_exp = ary_other[:, 0].sum()  # sum of rewards in an episode
+    _r_exp = ary_other[:, 0].sum()  #todo:check if sum of rewards in an episode
     return _steps, _r_exp
 
 
 def get_episode_return(env, act, device):
     '''get information of one episode during the training'''
     episode_return = 0.0  # sum of rewards in an episode
+    ##todo add more information to the episode
     state = env.reset()
     # in each episode, there are 36 iterations
-    for i in range(36):
+    for i in range(36): #num_steps
         s_tensor = torch.as_tensor((state,), device=device) # convert a current state to tensor
         a_tensor = act(s_tensor) #call the actor network to get the action tensor
         action = a_tensor.detach().cpu().numpy()[0]  # get action variable by detaching the tensor and converting to numpy
-        dummy_agent= da.Agent(time_step, market_info, resource_info)
-        state, next_state, reward, done,= env.step(market_info,dummy_agent,action)
+        state, next_state, reward, done,= env.step(action)
         state=next_state
         episode_return += reward
         
@@ -358,54 +387,85 @@ def get_episode_return(env, act, device):
             break
     return episode_return
 
-def train_agent(time_step, market_info, resource_info):
-    all_actions = []
-    all_eps_rewards = []
-    all_cummulative_rewards = []
+def train_agent(time_step, cleared_market, resource_info):
+    args = Arguments()
+    reward_record = {'episode': [], 'steps': [], 'mean_episode_reward': []}
+    loss_record = {'episode': [], 'steps': [], 'critic_loss': [], 'actor_loss': [], 'entropy_loss': []}
     # Create an instance of the AgentDA class
-    agent = AgentDA(time_step, market_info, resource_info)
-    env = DAEnv(time_step, market_info, resource_info)
-    agent.init(args.net_dim, env.state_space.shape[0], env.action_space.shape[0], args.learning_rate, args.if_per_or_gae)
+    for seed in args.random_seed_list:
+        args.random_seed = seed
+        # set different seed
+        args.agent = AgentDA(time_step, cleared_market, resource_info)
+        agent_name = f'{args.agent.__class__.__name__}'
+        args.agent.cri_target = True
+        args.agent.cri_target = True  # Add the attribute cri_target to the args.agent object
+        args.env = DAEnv()
+        args.init_before_training(if_main=True)
+        '''init agent and environment'''
+        agent = args.agent
+        env = args.env
+        agent.init(args.net_dim, env.state_space.shape[0], env.action_space.shape[0], args.learning_rate,
+                   args.if_per_or_gae) # need env.action_space.shape[0] to initialize the network
+        '''init replay buffer'''
+        buffer = ReplayBuffer(max_len=args.max_memo, state_dim=env.state_space.shape[0],
+                      action_dim=env.action_space.shape[0])
+        '''start training'''
+        cwd = args.cwd
+        gamma = args.gamma
+        batch_size = args.batch_size  # how much data should be used to update net
+        target_step = args.target_step  # how manysteps of one episode should stop
+        repeat_times = args.repeat_times  # how many times should update for one batch size data
+        soft_update_tau = args.soft_update_tau
+        agent.state = env.reset()
+        '''collect data and train and update network'''
+        num_episode = args.num_episode
+        args.train=True
+        args.save_network=True
+    if args.train:
+            collect_data = True
+            while collect_data:
+                print(f'buffer:{buffer.now_len}')
+                with torch.no_grad():
+                    trajectory = agent.explore_env(env, target_step)
+                    steps, r_exp = update_buffer(trajectory)
+                    buffer.update_now_len()
+                if buffer.now_len >= 10000:
+                    collect_data = False
+        # Train the agent for args.num_episode episodes
+            for i_episode in range(args.num_episode):
+                critic_loss, actor_loss = agent.update_net(buffer, args.batch_size, args.repeat_times, args.soft_update_tau)
+                loss_record['critic_loss'].append(critic_loss)
+                loss_record['actor_loss'].append(actor_loss)
+                # Log or record the losses, rewards, and other metrics as needed
 
-    # Initialize the replay buffer
-    buffer = ReplayBuffer(max_len=args.max_memo, state_dim=env.state_space.shape[0], action_dim=env.action_space.shape[0])
+                with torch.no_grad():
+                    episode_reward = get_episode_return(env, agent.act, agent.device)
+                    reward_record['mean_episode_reward'].append(episode_reward)
+                    # Log or record the episode reward as needed
 
-    # Collect initial data and train the agent
-    agent.state = env.reset()
-    trajectory = agent.explore_env(env, args.target_step)
-    update_buffer(trajectory)
+                print(f'current episode is {i_episode}, reward:{episode_reward}, buffer_length: {buffer.now_len}')
 
-    # Train the agent for args.num_episode episodes
-    for i_episode in range(args.num_episode):
-        critic_loss, actor_loss = agent.update_net(buffer, args.batch_size, args.repeat_times, args.soft_update_tau)
-        # Log or record the losses, rewards, and other metrics as needed
+                if i_episode % 10 == 0:
+                    # target_step
+                    with torch.no_grad():
+                        agent._update_exploration_rate(args.explorate_decay, args.explorate_min)
+                        trajectory = agent.explore_env(env, args.target_step)
+                        steps, r_exp = update_buffer(trajectory)
+    if args.update_training_data:
+        loss_record_path = f'{args.cwd}/loss_data.pkl'
+        reward_record_path = f'{args.cwd}/reward_data.pkl'
+        with open(loss_record_path, 'wb') as tf:
+            pickle.dump(loss_record, tf)
+        with open(reward_record_path, 'wb') as tf:
+            pickle.dump(reward_record, tf)
+    act_save_path = f'{args.cwd}/actor.pth'
+    cri_save_path = f'{args.cwd}/critic.pth'
 
-        with torch.no_grad():
-            episode_reward = get_episode_return(env, agent.act, agent.device)
-            all_eps_rewards.append(episode_reward)
-            # Log or record the episode reward, unbalance, and operation cost as needed
-
-        #print(f'current episode is {i_episode}, reward:{episode_reward}, buffer_length: {buffer.now_len}')
-
-        if i_episode % 10 == 0:
-            agent._update_exploration_rate(args.explorate_decay, args.explorate_min)
-            trajectory = agent.explore_env(env, args.target_step)
-            update_buffer(trajectory)
-            all_actions.extend(item[1][2:] for item in trajectory)
-            all_cummulative_rewards.append(np.sum(all_eps_rewards))
-    # Save actions and rewards
-    with open(f'{args.cwd}/actions.pkl', 'wb') as f:
-        pickle.dump(all_actions, f)
-
-    with open(f'{args.cwd}/rewards.pkl', 'wb') as f:
-        pickle.dump(all_eps_rewards, f)
-    # Save the trained agent's parameters if needed
+    print('training data have been saved')# Save actions and rewards
     if args.save_network:
-        act_save_path = f'{args.cwd}/actor.pth'
-        cri_save_path = f'{args.cwd}/critic.pth'
-        torch.save(agent.act.state_dict(), act_save_path)
-        torch.save(agent.cri.state_dict(), cri_save_path)
-        #print('Training finished and actor and critic parameters have been saved')
+            torch.save(agent.act.state_dict(), act_save_path)
+            torch.save(agent.cri.state_dict(), cri_save_path)
+            print('training finished and actor and critic parameters have been saved')
 
 if __name__ == '__main__':
     # Add argument parser for three required input arguments
@@ -417,22 +477,27 @@ if __name__ == '__main__':
     parser.add_argument('resource_file', help='path to json formatted dictionary with resource \
                         information.')
 
-    args = parser.parse_args()
-
+    args1 = parser.parse_args()
+    
     # Parse json inputs into python dictionaries
-    time_step = args.time_step
-    with open(args.market_file, 'r') as f:
+    time_step = args1.time_step
+    with open(args1.market_file, 'r') as f:
         market_info = json.load(f)
-    with open(args.resource_file, 'r') as f:
-        resource_info = json.load(f)
-
+    with open(args1.resource_file, 'r') as f:
+        resource_info = json.load(f)    
+    da.make_an_offer
+    # Save the updated market information to a file
+    with open(f'market_{time_step}.json', 'w') as f:
+        json.dump(market_info, f, cls=NpEncoder)
+    
+    #new_time_step =time_step+1
+    
     # Read in information from the market
     uid = market_info["uid"]
     market_type = market_info["market_type"]
     rid = resource_info["rid"]
-    ##to do:check if time_step in weasle is the same as in the agent
+    ##time_step in weasle is episode in RL
 
     #os.environ["WANDB_API_KEY"] = "df5048753b47e0d3fb14ffae7704c794cd0639f1"
     args = Arguments()
-    args.init_before_training(if_main=True)
-    train_agent(time_step, market_info, resource_info)
+    train_agent(time_step, market_info, resource_info)##to do: need to pass the market and resource after sending the cost offers
