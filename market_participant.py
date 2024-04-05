@@ -15,7 +15,7 @@ import pyomo.kernel as pmo
 import json
 import offer_utils as ou
 import argparse
-from dummy_algorithm_Br import Agent
+import dummy_algorithm_Br as da
 
 
 import tempfile 
@@ -481,21 +481,28 @@ if __name__ == '__main__':
     
     # Parse json inputs into python dictionaries
     time_step = args1.time_step
+    
     with open(args1.market_file, 'r') as f:
         market_info = json.load(f)
     with open(args1.resource_file, 'r') as f:
         resource_info = json.load(f)    
-    da.make_an_offer
-    # Save the updated market information to a file
-    with open(f'market_{time_step}.json', 'w') as f:
-        json.dump(market_info, f, cls=NpEncoder)
-    
-    #new_time_step =time_step+1
-    
-    # Read in information from the market
+        # Read in information from the market
     uid = market_info["uid"]
     market_type = market_info["market_type"]
     rid = resource_info["rid"]
+    da_agent = da.Agent(time_step,market_info, resource_info)
+    #
+    da_agent.make_an_offer()## scaled_offer=f(action, dummy_offer)
+    # Save the updated market information to a file
+    with open(f'market_{time_step}.json', 'w') as f:
+        json.dump(market_info, f, cls=NpEncoder)
+    with open(f'resource_{time_step}.json', 'w') as f:
+        json.dump(resource_info, f, cls=NpEncoder)
+
+    
+    #new_time_step =time_step+1
+    
+    
     ##time_step in weasle is episode in RL
 
     #os.environ["WANDB_API_KEY"] = "df5048753b47e0d3fb14ffae7704c794cd0639f1"
